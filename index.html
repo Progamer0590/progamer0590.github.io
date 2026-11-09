@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Crazy Elevator</title>
+<style>
+:root{--bg:#14121f;--card:#241f3a;--yellow:#ffd23f;--coral:#ff5d73;--mint:#5ce1b0;--ink:#f6f3ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;touch-action:manipulation}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column}
+.hidden{display:none!important}
+#menu{padding:16px;overflow-y:auto;display:block}
+#menu h1{margin:6px 0 2px;font-size:34px;text-align:center;color:var(--yellow);letter-spacing:1px;text-shadow:0 3px 0 var(--coral)}
+.tag{text-align:center;margin:0 0 12px;opacity:.8}
+.coins{text-align:center;font-size:20px;font-weight:700;margin-bottom:10px}
+h3{margin:14px 0 6px;font-size:15px;opacity:.85}
+.row{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px}
+.chip{flex:none;border:2px solid transparent;background:var(--card);color:var(--ink);border-radius:14px;padding:10px 12px;font-size:14px}
+.chip.sel{border-color:var(--yellow);background:#3a3260}
+.chip.lock{opacity:.7}
+.mode{display:block;width:100%;text-align:left;margin:8px 0;padding:12px 14px;border:0;border-radius:16px;background:var(--coral);color:#fff;font-size:17px;position:relative}
+.mode:nth-child(2){background:#7c5cff}.mode:nth-child(3){background:#1fae85}.mode:nth-child(4){background:#e08a00}
+.mode small{display:block;font-size:12px;opacity:.9;margin-top:2px}
+.mode em{position:absolute;right:12px;top:12px;font-size:12px;font-style:normal;background:rgba(0,0,0,.25);padding:2px 8px;border-radius:10px}
+.help{font-size:13px;opacity:.75;line-height:1.5;margin-top:12px}
+#game{background:#000}
+#hud{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--card);font-weight:700;font-size:15px;gap:6px}
+#hud button{border:0;background:#3a3260;color:var(--ink);border-radius:10px;padding:6px 10px;font-size:15px}
+#c{width:100%;flex:1;min-height:0;object-fit:contain;background:#000}
+#ctrl{display:flex;gap:8px;padding:10px;background:var(--card)}
+#ctrl button{flex:1;height:68px;border:0;border-radius:18px;font-size:18px;font-weight:800;color:#1a1530;background:var(--yellow);box-shadow:0 5px 0 #b8941a}
+#ctrl button:active{transform:translateY(4px);box-shadow:0 1px 0 #b8941a}
+#ctrl #open{background:var(--mint);box-shadow:0 5px 0 #2e9c77}
+#ctrl #open:active{box-shadow:0 1px 0 #2e9c77}
+#msg{position:fixed;top:58px;left:50%;transform:translateX(-50%);background:rgba(20,18,31,.92);border:2px solid var(--yellow);padding:8px 14px;border-radius:14px;font-weight:700;font-size:14px;text-align:center;max-width:92%;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+#over{background:rgba(10,8,20,.88);align-items:center;justify-content:center;text-align:center;padding:20px;z-index:8}
+#over h2{font-size:30px;margin:0 0 12px;color:var(--yellow)}
+#os{font-size:18px;line-height:1.9;margin-bottom:18px}
+#over button{display:block;width:240px;margin:8px auto;padding:14px;border:0;border-radius:16px;font-size:18px;font-weight:700;background:var(--mint);color:#102;}
+#over button.alt{background:#3a3260;color:var(--ink)}
+</style>
+</head>
+<body>
+<div id="msg"></div>
+
+<div id="menu" class="screen">
+  <h1>🛗 CRAZY ELEVATOR</h1>
+  <p class="tag">One Elevator. Endless Chaos!</p>
+  <div class="coins" id="coins"></div>
+  <h3>Building</h3><div class="row" id="bl"></div>
+  <h3>Elevator</h3><div class="row" id="sl"></div>
+  <h3>Play</h3><div id="ml"></div>
+  <div class="help">
+    ⬆ UP / ⬇ DOWN move one floor. 🚪 OPEN lets people out and in (max 3).<br>
+    The number under each passenger is their floor. Watch the patience bar!<br>
+    😡 angry · 🕺 dancer · 🤵 VIP (fast = bonus) · 😴 sleepy · ❓ mystery floor
+  </div>
+</div>
+
+<div id="game" class="screen hidden">
+  <div id="hud">
+    <span id="h1"></span><span id="h2"></span><span id="h3"></span><span id="h4"></span>
+    <button id="quit">🏠</button>
+  </div>
+  <canvas id="c" width="360" height="480"></canvas>
+  <div id="ctrl">
+    <button id="up">⬆ UP</button>
+    <button id="open">🚪 OPEN</button>
+    <button id="down">⬇ DOWN</button>
+  </div>
+</div>
+
+<div id="over" class="screen hidden">
+  <h2 id="ot"></h2>
+  <div id="os"></div>
+  <button id="again">🔁 Play again</button>
+  <button id="home" class="alt">🏠 Menu</button>
+</div>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var R=function(a,b){return a+Math.random()*(b-a)};
+var RI=function(a,b){return Math.floor(R(a,b+1))};
+var PK=function(a){return a[RI(0,a.length-1)]};
+var N=6,W=360,H=480,FH=H/N,CAP=3;
+
+var BS=[
+ {n:'Office Tower',e:'🏢',c1:'#3b4a6b',c2:'#1d2538',cost:0},
+ {n:'Luxury Hotel',e:'🏨',c1:'#8a5a2b',c2:'#2e1b10',cost:50},
+ {n:'Hospital',e:'🏥',c1:'#2f8a8a',c2:'#123636',cost:100},
+ {n:'School',e:'🏫',c1:'#9a7a1e',c2:'#33280a',cost:150},
+ {n:'Shopping Mall',e:'🏬',c1:'#9a2f78',c2:'#33102a',cost:200},
+ {n:'Skyscraper',e:'🏙️',c1:'#2f6fb0',c2:'#0f2238',cost:300},
+ {n:'Space Station',e:'🚀',c1:'#4a2f9a',c2:'#0b0820',cost:500}];
+var SK=[
+ {n:'Classic',e:'🛗',cost:0,col:'#cfd8dc'},
+ {n:'Gold',e:'🥇',cost:80,col:'#ffd54f'},
+ {n:'Neon',e:'💚',cost:150,col:'#69f0ae'},
+ {n:'Rocket',e:'🚀',cost:250,col:'#ff8a65'},
+ {n:'Disco',e:'🪩',cost:400,col:'#ce93d8'}];
+var MODES={
+ classic:{n:'Classic',lives:3,time:0,goal:12,ramp:0,d:'Deliver 12 passengers. 3 lives.'},
+ time:{n:'Time Challenge',lives:5,time:90,goal:0,ramp:0,d:'90 seconds. Deliver as many as you can.'},
+ endless:{n:'Endless',lives:0,time:0,goal:0,ramp:0,d:'No lives, no end. Tap 🏠 when done.'},
+ survival:{n:'Survival',lives:3,time:0,goal:0,ramp:1,d:'Gets harder every minute.'}};
+
+var PQ={n:['Going to floor','Floor','Take me to'],a:['HURRY UP! Floor','Ugh! Floor','Now! Floor'],d:['*dancing* Floor','Boogie to floor'],v:['VIP! Quick, floor','Important! Floor'],s:['zzz... floor']};
+var DQ={n:['Thanks, driver!','Smooth ride!','Have a nice day!'],a:['About time!','Finally!','Tch.'],d:['*drops the beat*','Best ride ever!'],v:['Excellent service.','VIP approved!'],s:['Huh? Oh... bye...','Zzz... thanks']};
+var LQ=['stormed off!','took the stairs!','gave up!','left a 1-star review!'];
+
+var S={coins:0,bu:[0],sk:[0],b:0,s:0,best:{}};
+try{var sv=JSON.parse(localStorage.getItem('crazyelev')||'null');if(sv)for(var k in sv)S[k]=sv[k];}catch(e){}
+function save(){try{localStorage.setItem('crazyelev',JSON.stringify(S));}catch(e){}}
+
+var cv=$('c'),x=cv.getContext('2d'),G=null,tt=null,lastMode='classic';
+
+function toast(s,ms){var m=$('msg');m.textContent=s;m.style.opacity=1;clearTimeout(tt);tt=setTimeout(function(){m.style.opacity=0},ms||1600);}
+
+/* ---------- menu ---------- */
+function chip(k,i,label,owned,cost,sel){
+ return '<button class="chip'+(sel?' sel':'')+(owned?'':' lock')+'" data-k="'+k+'" data-i="'+i+'">'+label+(owned?'':' 🔒'+cost+'🪙')+'</button>';
+}
+function menu(){
+ G=null;cv.style.filter='';
+ $('over').classList.add('hidden');$('game').classList.add('hidden');$('menu').classList.remove('hidden');
+ $('coins').textContent='🪙 '+S.coins;
+ $('bl').innerHTML=BS.map(function(b,i){return chip('b',i,b.e+' '+b.n,S.bu.indexOf(i)>=0,b.cost,S.b===i)}).join('');
+ $('sl').innerHTML=SK.map(function(s,i){return chip('s',i,s.e+' '+s.n,S.sk.indexOf(i)>=0,s.cost,S.s===i)}).join('');
+ $('ml').innerHTML=Object.keys(MODES).map(function(k){var m=MODES[k];
+  return '<button class="mode" data-m="'+k+'"><b>'+m.n+'</b><small>'+m.d+'</small>'+(S.best[k]?'<em>Best '+S.best[k]+'</em>':'')+'</button>'}).join('');
+}
+$('menu').addEventListener('click',function(e){
+ var c=e.target.closest('[data-k]'),m=e.target.closest('[data-m]');
+ if(c){
+  var k=c.getAttribute('data-k'),i=+c.getAttribute('data-i'),list=k==='b'?BS:SK,own=k==='b'?S.bu:S.sk;
+  if(own.indexOf(i)<0){
+   if(S.coins<list[i].cost){toast('Not enough coins yet 🪙');return;}
+   S.coins-=list[i].cost;own.push(i);toast('Unlocked '+list[i].n+'!');
+  }
+  S[k]=i;save();menu();
+ }else if(m){start(m.getAttribute('data-m'));}
+});
+
+/* ---------- game ---------- */
+function start(m){
+ var M=MODES[m];lastMode=m;
+ G={m:m,M:M,y:0,tgt:0,doors:0,da:0,wait:[],ins:[],lives:M.lives,time:M.time,del:0,coins:0,score:0,t:0,
+    spT:1,evT:12,stuck:0,rev:0,party:0,my:RI(1,N-1),myT:20,over:0,last:performance.now(),shake:0};
+ $('menu').classList.add('hidden');$('over').classList.add('hidden');$('game').classList.remove('hidden');
+ cv.style.filter='';
+ spawn();spawn();
+ toast('Tap OPEN on a floor to pick people up!',2200);
+ requestAnimationFrame(loop);
+}
+
+function spawn(){
+ var g=G;if(g.wait.length>=7)return;
+ var cnt=[0,0,0,0,0,0];g.wait.forEach(function(p){cnt[p.f]++});
+ var fl=[];for(var f=0;f<N;f++)if(cnt[f]<2)fl.push(f);
+ if(!fl.length)return;
+ var f2=PK(fl),r=Math.random(),ty=r<.5?'n':r<.64?'a':r<.76?'d':r<.84?'v':'s',d;
+ do{d=RI(0,N-1)}while(d===f2);
+ var e={n:PK(['🧑','👩','👨','🧓','👧','🧔','👱']),a:'😡',d:'🕺',v:'🤵',s:'😴'}[ty];
+ var pat={n:40,a:25,d:40,v:22,s:45}[ty];
+ g.wait.push({f:f2,d:d,ty:ty,e:e,pat:pat,max:pat});
+}
+
+function lose(p){
+ var g=G;
+ if(g.M.lives>0)g.lives--;else g.coins=Math.max(0,g.coins-3);
+ toast(p.e+' '+PK(LQ)+(g.M.lives>0?' -1 ❤️':' -3 🪙'),1800);g.shake=1;
+}
+
+function event(){
+ var g=G,k=RI(0,3);
+ if(k===0){g.stuck=3;toast(Math.abs(g.y-Math.round(g.y))>.01?'🛑 Stuck between floors!':'⚡ POWER FAILURE!',2500);}
+ else if(k===1){g.rev=8;cv.style.filter='hue-rotate(140deg) saturate(1.6)';toast('🌀 CRAZY FLOOR! Controls reversed!',2500);}
+ else if(k===2){toast('🚨 RUSH HOUR! Everyone wants a ride!',2500);spawn();spawn();spawn();}
+ else{g.my=RI(0,N-1);g.myT=R(12,18);toast('❓ A mystery floor appeared!',2500);}
+}
+
+function surprise(){
+ var g=G,k=RI(0,5),c;
+ if(k===0){c=RI(15,40);g.coins+=c;toast('💰 Hidden treasure! +'+c+' 🪙',2200);}
+ else if(k===1){if(g.M.time){g.time+=10;toast('⏰ Time warp! +10 seconds',2200);}else{g.coins+=15;toast('🎁 Gift box! +15 🪙',2200);}}
+ else if(k===2){g.party=6;toast('🪩 DISCO PARTY! Super speed!',2200);}
+ else if(k===3){if(g.M.lives>0&&g.lives<5){g.lives++;toast('❤️ Free life!',2200);}else{g.coins+=10;toast('🍀 Lucky! +10 🪙',2200);}}
+ else if(k===4){g.coins=Math.max(0,g.coins-8);g.shake=1;toast('🍌 Banana peel! -8 🪙',2200);}
+ else{g.coins+=5;toast('🐔 A chicken hops in, hops out. Nobody asks. +5 🪙',2400);}
+}
+
+function deliver(p){
+ var g=G,c=5;
+ if(p.ty==='v')c=10+(p.pat>p.max*.5?15:0);
+ if(p.ty==='d')c=7;
+ g.coins+=c;g.del++;g.score+=c*2;
+ toast(p.e+' '+PK(DQ[p.ty])+' +'+c+'🪙',1500);
+ if(g.M.goal&&g.del>=g.M.goal)end('🏆 Shift complete!');
+}
+
+function openDoors(){
+ var g=G;if(!g||g.over)return;
+ if(g.stuck>0){toast('Elevator is stuck!');return;}
+ if(Math.abs(g.y-g.tgt)>.001){toast('Wait until you reach a floor!');return;}
+ if(g.doors>0)return;
+ var f=Math.round(g.y),i;g.doors=.9;
+ for(i=g.ins.length-1;i>=0;i--){
+  var p=g.ins[i];
+  if(p.d===f){g.ins.splice(i,1);deliver(p);if(p.ty==='s'){g.doors+=1.3;}}
+ }
+ if(g.over)return;
+ for(i=0;i<g.wait.length;i++){
+  var q=g.wait[i];if(q.f!==f)continue;
+  if(g.ins.length>=CAP){toast('🏋️ OVERLOAD! Max '+CAP+' passengers');g.shake=1;break;}
+  g.wait.splice(i--,1);g.ins.push(q);
+  toast(q.e+' '+PK(PQ[q.ty])+' '+(q.d+1),1500);
+ }
+ if(g.my===f){g.my=-1;g.myT=R(8,14);surprise();}
+}
+
+function mv(d){
+ var g=G;if(!g||g.over)return;
+ if(g.stuck>0){toast('Elevator is stuck!');return;}
+ if(g.rev>0)d=-d;
+ g.doors=0;g.tgt=Math.max(0,Math.min(N-1,g.tgt+d));
+}
+
+function end(t){
+ var g=G;if(!g||g.over)return;
+ g.over=1;cv.style.filter='';
+ S.coins+=g.coins;
+ var nb=g.score>(S.best[g.m]||0);if(nb)S.best[g.m]=g.score;
+ save();
+ $('ot').textContent=t;
+ $('os').innerHTML='✅ Delivered: <b>'+g.del+'</b><br>🪙 Coins earned: <b>'+g.coins+'</b><br>⭐ Score: <b>'+g.score+'</b>'+(nb?'<br>🎉 New best!':'');
+ $('over').classList.remove('hidden');
+}
+
+function upd(dt){
+ var g=G;g.t+=dt;
+ if(g.M.time){g.time-=dt;if(g.time<=0){g.time=0;end('⏱ Time is up!');return;}}
+ g.spT-=dt;
+ if(g.spT<=0){var df=g.t/30*(g.M.ramp?2:1);g.spT=Math.max(1.3,4-df*.25);spawn();}
+ g.evT-=dt;
+ if(g.evT<=0){g.evT=R(12,20)-(g.M.ramp?Math.min(6,g.t/30):0);event();}
+ g.myT-=dt;
+ if(g.myT<=0){g.myT=R(15,25);g.my=RI(0,N-1);}
+ if(g.rev>0){g.rev-=dt;if(g.rev<=0)cv.style.filter='';}
+ if(g.party>0)g.party-=dt;
+ if(g.shake>0)g.shake=Math.max(0,g.shake-dt*2);
+ g.da+=((g.doors>0?1:0)-g.da)*Math.min(1,dt*10);
+ if(g.doors>0)g.doors-=dt;
+ if(g.stuck>0){g.stuck-=dt;if(g.stuck<=0)toast('⚡ Power is back!');}
+ else if(g.doors<=0&&Math.abs(g.y-g.tgt)>.001){
+  var d=g.tgt>g.y?1:-1;
+  g.y+=d*(g.party>0?3.2:2)*dt;
+  if((g.tgt-g.y)*d<=0)g.y=g.tgt;
+ }
+ g.wait.forEach(function(p){p.pat-=dt*(p.ty==='a'?2:1)});
+ g.ins.forEach(function(p){p.pat-=dt*(p.ty==='a'?1.2:.6)});
+ [g.wait,g.ins].forEach(function(l){
+  for(var i=l.length-1;i>=0;i--)if(l[i].pat<=0){lose(l.splice(i,1)[0]);}
+ });
+ if(g.M.lives>0&&g.lives<=0)end('💥 Out of lives!');
+}
+
+/* ---------- drawing ---------- */
+function draw(){
+ var g=G,b=BS[S.b],sk=SK[S.s],f,i;
+ var gr=x.createLinearGradient(0,0,0,H);gr.addColorStop(0,b.c1);gr.addColorStop(1,b.c2);
+ x.fillStyle=gr;x.fillRect(0,0,W,H);
+ if(S.b===6){x.fillStyle='#fff';for(i=0;i<30;i++)x.fillRect((i*97)%W,(i*53)%H,2,2);}
+ x.textAlign='center';x.textBaseline='middle';
+ for(f=0;f<N;f++){
+  var top=H-(f+1)*FH;
+  x.fillStyle='rgba(255,255,255,.1)';x.fillRect(0,top+FH-4,W,4);
+  x.fillStyle='rgba(255,255,255,.6)';x.font='bold 14px sans-serif';x.fillText(String(f+1),337,top+FH/2);
+  if(g.my===f){x.font='22px serif';x.fillText('❓',302,top+FH/2);}
+ }
+ x.fillStyle='rgba(0,0,0,.45)';x.fillRect(120,0,120,H);
+ x.fillStyle='rgba(255,255,255,.12)';x.fillRect(178,0,4,H);
+
+ var cy=H-(g.y+.5)*FH,ox=0;
+ if(g.ins.some(function(p){return p.ty==='d'})||g.party>0)ox=Math.sin(g.t*20)*2;
+ if(g.shake>0)ox+=Math.sin(g.t*60)*4;
+ var cx=128+ox,y0=cy-FH/2+3,cw=104,ch=FH-6;
+ x.fillStyle=sk.col;x.fillRect(cx,y0,cw,ch);
+ x.font='13px serif';x.fillStyle='#000';x.fillText(sk.e,cx+cw/2,y0+8);
+ x.fillStyle='#1c1830';x.fillRect(cx+5,y0+16,cw-10,ch-19);
+ g.ins.forEach(function(p,i){
+  var px=cx+22+i*30,py=y0+ch/2+4;
+  if(p.ty==='d'||g.party>0)py+=Math.sin(g.t*14+i)*3;
+  x.font='24px serif';x.fillText(p.e,px,py);
+  x.font='bold 11px sans-serif';x.fillStyle='#fff';x.fillText('→'+(p.d+1),px,y0+ch-8);
+  var r=Math.max(0,p.pat/p.max);
+  x.fillStyle=r>.5?'#66bb6a':r>.25?'#ffca28':'#ef5350';x.fillRect(px-11,y0+19,22*r,3);
+ });
+ var dw=(1-g.da)*((cw-10)/2);
+ x.fillStyle=sk.col;
+ x.fillRect(cx+5,y0+16,dw,ch-19);x.fillRect(cx+cw-5-dw,y0+16,dw,ch-19);
+ x.fillStyle='rgba(0,0,0,.25)';x.fillRect(cx+cw/2-1,y0+16,2,(ch-19)*(1-g.da));
+ if(g.stuck>0&&Math.floor(g.t*6)%2){x.font='30px serif';x.fillText('⚡',cx+cw/2,cy);}
+
+ var cnt={};
+ g.wait.forEach(function(p){
+  var i=cnt[p.f]||0;cnt[p.f]=i+1;
+  var px=92-i*52,py=H-(p.f+.5)*FH;
+  x.font='28px serif';x.fillText(p.e,px,py-2);
+  x.font='bold 11px sans-serif';x.fillStyle='#fff';x.fillText('→'+(p.d+1),px,py+20);
+  var r=Math.max(0,p.pat/p.max);
+  x.fillStyle='rgba(0,0,0,.5)';x.fillRect(px-18,py-30,36,4);
+  x.fillStyle=r>.5?'#66bb6a':r>.25?'#ffca28':'#ef5350';x.fillRect(px-18,py-30,36*r,4);
+  if(p.ty==='v'){x.font='12px serif';x.fillText('⭐',px+17,py-24);}
+ });
+ if(g.rev>0){x.fillStyle='#fff';x.font='bold 13px sans-serif';x.fillText('🌀 Controls reversed '+Math.ceil(g.rev)+'s',W/2,14);}
+ if(g.party>0){x.fillStyle='#fff';x.font='bold 13px sans-serif';x.fillText('🪩 Disco '+Math.ceil(g.party)+'s',W/2,H-10);}
+}
+
+function hud(){
+ var g=G,M=g.M;
+ $('h1').textContent=M.lives?(g.lives>0?new Array(g.lives+1).join('❤️'):'💔'):'♾️';
+ $('h2').textContent='⏱ '+(M.time?Math.ceil(g.time):Math.floor(g.t));
+ $('h3').textContent='🪙 '+g.coins;
+ $('h4').textContent='✅ '+g.del+(M.goal?'/'+M.goal:'');
+}
+
+function loop(n){
+ var g=G;if(!g)return;
+ var dt=Math.min(.05,(n-g.last)/1000);g.last=n;
+ if(!g.over)upd(dt);
+ draw();hud();
+ if(!g.over)requestAnimationFrame(loop);
+}
+
+/* ---------- controls ---------- */
+function bind(id,fn){var b=$(id);b.addEventListener('pointerdown',function(e){e.preventDefault();fn();});}
+bind('up',function(){mv(1)});
+bind('down',function(){mv(-1)});
+bind('open',openDoors);
+$('quit').addEventListener('click',function(){if(G&&!G.over)end('🏁 Shift ended');else menu();});
+$('again').addEventListener('click',function(){start(lastMode)});
+$('home').addEventListener('click',menu);
+document.addEventListener('keydown',function(e){
+ if(!G)return;
+ if(e.key==='ArrowUp')mv(1);else if(e.key==='ArrowDown')mv(-1);else if(e.key===' '||e.key==='Enter')openDoors();
+});
+
+menu();
+})();
+</script>
+</body>
+</html>
