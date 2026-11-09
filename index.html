@@ -10,7 +10,8 @@
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;touch-action:manipulation}
 .screen{position:fixed;inset:0;display:flex;flex-direction:column}
 .hidden{display:none!important}
-#menu{padding:16px;overflow-y:auto;display:block}
+#menu{padding:16px 16px 80px;overflow-y:auto;display:block}
+#ad{position:fixed;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;justify-content:center;background:#0e0c18;z-index:20;overflow:hidden}
 #menu h1{margin:6px 0 2px;font-size:34px;text-align:center;color:var(--yellow);letter-spacing:1px;text-shadow:0 3px 0 var(--coral)}
 .tag{text-align:center;margin:0 0 12px;opacity:.8}
 .coins{text-align:center;font-size:20px;font-weight:700;margin-bottom:10px}
@@ -78,9 +79,23 @@ h3{margin:14px 0 6px;font-size:15px;opacity:.85}
   <button id="home" class="alt">🏠 Menu</button>
 </div>
 
+<div id="ad">
+<script>
+  atOptions = {
+    'key' : 'f30d7be3a1b62a23f2362a0452732aaa',
+    'format' : 'iframe',
+    'height' : 50,
+    'width' : 320,
+    'params' : {}
+  };
+</script>
+<script src="https://bicea.org/22/f30d7be3a1b62a23f2362a0452732aaa"></script>
+</div>
+
 <script>
 (function(){
 var $=function(i){return document.getElementById(i)};
+function ad(on){var a=$('ad');if(a)a.style.display=(on&&navigator.onLine)?'flex':'none';}
 var R=function(a,b){return a+Math.random()*(b-a)};
 var RI=function(a,b){return Math.floor(R(a,b+1))};
 var PK=function(a){return a[RI(0,a.length-1)]};
@@ -123,7 +138,7 @@ function chip(k,i,label,owned,cost,sel){
  return '<button class="chip'+(sel?' sel':'')+(owned?'':' lock')+'" data-k="'+k+'" data-i="'+i+'">'+label+(owned?'':' 🔒'+cost+'🪙')+'</button>';
 }
 function menu(){
- G=null;cv.style.filter='';
+ G=null;cv.style.filter='';ad(true);
  $('over').classList.add('hidden');$('game').classList.add('hidden');$('menu').classList.remove('hidden');
  $('coins').textContent='🪙 '+S.coins;
  $('bl').innerHTML=BS.map(function(b,i){return chip('b',i,b.e+' '+b.n,S.bu.indexOf(i)>=0,b.cost,S.b===i)}).join('');
@@ -149,7 +164,7 @@ function start(m){
  G={m:m,M:M,y:0,tgt:0,doors:0,da:0,wait:[],ins:[],lives:M.lives,time:M.time,del:0,coins:0,score:0,t:0,
     spT:1,evT:12,stuck:0,rev:0,party:0,my:RI(1,N-1),myT:20,over:0,last:performance.now(),shake:0};
  $('menu').classList.add('hidden');$('over').classList.add('hidden');$('game').classList.remove('hidden');
- cv.style.filter='';
+ cv.style.filter='';ad(false);
  spawn();spawn();
  toast('Tap OPEN on a floor to pick people up!',2200);
  requestAnimationFrame(loop);
@@ -235,7 +250,7 @@ function end(t){
  save();
  $('ot').textContent=t;
  $('os').innerHTML='✅ Delivered: <b>'+g.del+'</b><br>🪙 Coins earned: <b>'+g.coins+'</b><br>⭐ Score: <b>'+g.score+'</b>'+(nb?'<br>🎉 New best!':'');
- $('over').classList.remove('hidden');
+ $('over').classList.remove('hidden');ad(true);
 }
 
 function upd(dt){
